@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Class Status & Charts</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .status-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .last-update {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 25px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .sensors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 25px;
+            justify-items: center;
+        }
+
+        .sensor-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            width: 100%;
+        }
+
+        .sensor-item img {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 10px;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1));
+        }
+
+        .sensor-item .label {
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 5px;
+            text-transform: capitalize;
+        }
+
+        .sensor-item .value {
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .no-data {
+            font-style: italic;
+            color: #888;
+            margin-top: 20px;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        /* --- Chart Specific Styles --- */
+        .chart-section {
+            width: 100%;
+            max-width: 800px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            box-sizing: border-box;
+            margin-top: 20px; /* Add margin above chart section */
+        }
+
+        .chart-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .chart-controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        .chart-controls button:hover {
+            background-color: #0056b3;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            background-color: #e0e0e0;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #555;
+            border-radius: 5px;
+            margin: 5px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .tab-button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .tab-button:hover:not(.active) {
+            background-color: #d0d0d0;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 350px;
+            display: none;
+            margin-top: 15px;
+        }
+
+        .chart-container.active {
+            display: block;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+    </style>
+</head>
+<body>
+    <h1>Smart Class Environment Status</h1>
+
+    <div class="status-container">
+        <p class="last-update" id="last-update-time">Loading latest data...</p>
+        <div class="sensors-grid" id="sensors-display">
+            <!-- Sensor data will be loaded here -->
+        </div>
+        <p class="no-data" id="no-data-message" style="display: none;">No real-time status data found.</p>
+        <p class="error-message" id="error-message" style="display: none;"></p>
+    </div>
+
+    <div class="chart-section">
+        <h2>Historical Sensor Data</h2>
+        <div class="chart-controls">
+            <button onclick="readAllStatusDataAndRenderCharts('today')">Show Today's Data</button>
+            <button onclick="readAllStatusDataAndRenderCharts('all')">Show All Data</button>
+        </div>
+        <div class="tab-buttons" id="chart-tabs">
+            <button class="tab-button active" onclick="showChartTab('temperature')">Temperature</button>
+            <button class="tab-button" onclick="showChartTab('humidity')">Humidity</button>
+            <button class="tab-button" onclick="showChartTab('ac')">AC</button>
+            <button class="tab-button" onclick="showChartTab('heater')">Heater</button>
+            <button class="tab-button" onclick="showChartTab('light')">Light</button>
+            <button class="tab-button" onclick="showChartTab('motion')">Motion</button>
+            <button class="tab-button" onclick="showChartTab('noise')">Noise</button>
+        </div>
+
+        <div id="temperatureChartContainer" class="chart-container active">
+            <canvas id="temperatureChart"></canvas>
+        </div>
+        <div id="humidityChartContainer" class="chart-container">
+            <canvas id="humidityChart"></canvas>
+        </div>
+        <div id="acChartContainer" class="chart-container">
+            <canvas id="acChart"></canvas>
+        </div>
+        <div id="heaterChartContainer" class="chart-container">
+            <canvas id="heaterChart"></canvas>
+        </div>
+        <div id="lightChartContainer" class="chart-container">
+            <canvas id="lightChart"></canvas>
+        </div>
+        <div id="motionChartContainer" class="chart-container">
+            <canvas id="motionChart"></canvas>
+        </div>
+        <div id="noiseChartContainer" class="chart-container">
+            <canvas id="noiseChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // ✅ IMPORTANT: Replace with YOUR WEB APP's actual API_KEY and APP_ID
+        // from the Firebase Console -> Project settings -> Your apps -> Web app
+        const firebaseConfig = {
+          apiKey: "AIzaSyCMHPff049YeCmjaA2J-wab1dTrPS3eWIA", // <--- UPDATE THIS with your actual Firebase API Key!
+          authDomain: "smartclassoulu.firebaseapp.com",
+          databaseURL: "https://smartclassoulu-default-rtdb.europe-west1.firebasedatabase.app",
+          projectId: "smartclassoulu",
+          storageBucket: "smartclassoulu.appspot.com",
+          messagingSenderId: "599326172300",
+          appId: "YOUR_WEB_APP_APP_ID" // <--- UPDATE THIS with your actual Firebase App ID!
+        };
+
+        // ✅ Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        // Your authentication details (provided by your friend)
+        // WARNING: Hardcoding credentials directly in client-side code is NOT recommended for production.
+        // For secure authentication, use Firebase Authentication methods like email/password, Google Sign-In, etc.,
+        // and ensure user consent for data access.
+        const userEmail = "praktechsoulation@gmail.com";
+        const userPassword = "ITEE2025";
+
+        // Global variables to hold the Chart.js instances
+        let temperatureChart = null;
+        let humidityChart = null;
+        let acChart = null;
+        let heaterChart = null;
+        let lightChart = null;
+        let motionChart = null;
+        let noiseChart = null;
+
+        // Global variable to store all historical sensor data
+        let allSensorData = [];
+
+        // Attempt to sign in the user
+        auth.signInWithEmailAndPassword(userEmail, userPassword)
+            .then((userCredential) => {
+                console.log("User signed in:", userCredential.user.email);
+                readLatestStatusData(); // Call function to read latest data for grid
+                // Initial load: Show today's data by default
+                readAllStatusDataAndRenderCharts('today'); 
+            })
+            .catch((error) => {
+                const errorMessage = error.message;
+                console.error("Sign-in failed:", error.code, errorMessage);
+                document.getElementById('error-message').textContent = `Sign-in failed: ${errorMessage}`;
+                document.getElementById('error-message').style.display = 'block';
+            });
+
+        // Function to determine sensor image and status text for the LATEST display
+        function getSensorVisuals(sensorName, value) {
+            let imagePath = `images/${sensorName}_`; // Base path
+            let statusText = value; // Default display value
+
+            switch (sensorName) {
+                case 'ac':
+                case 'heater':
+                case 'light':
+                case 'motion':
+                    imagePath += (value === 1) ? 'green.png' : 'red.png';
+                    statusText = (value === 1) ? 'ON' : 'OFF';
+                    break;
+                case 'humidity':
+                    // Example thresholds: green for 30-60, red otherwise
+                    imagePath += (value >= 30 && value <= 60) ? 'green.png' : 'red.png';
+                    statusText = `${value}%`;
+                    break;
+                case 'temperature':
+                    // Example thresholds: green for 18-28, red otherwise
+                    imagePath += (value >= 18 && value <= 28) ? 'green.png' : 'red.png';
+                    statusText = `${value}°C`;
+                    break;
+                case 'noise_db':
+                case 'noise': // Handle if data sometimes comes as 'noise'
+                    // Example threshold: green for <70dB, red for >=70dB
+                    imagePath += (value < 70) ? 'green.png' : 'red.png';
+                    statusText = `${value}dB`;
+                    break;
+                default:
+                    imagePath = `images/default_unknown.png`; // Fallback image
+                    break;
+            }
+            return { image: imagePath, text: statusText };
+        }
+
+        // Function to read the latest status data (for the grid display)
+        function readLatestStatusData() {
+            const statusRef = database.ref('smartclass/status');
+            statusRef.orderByKey().limitToLast(1).on('value', (snapshot) => {
+                const sensorsDisplay = document.getElementById('sensors-display');
+                const lastUpdateTimeElement = document.getElementById('last-update-time');
+                const noDataMessage = document.getElementById('no-data-message');
+                sensorsDisplay.innerHTML = '';
+                noDataMessage.style.display = 'none';
+                lastUpdateTimeElement.textContent = 'Loading latest data...';
+
+                if (!snapshot.exists() || snapshot.numChildren() === 0) {
+                    lastUpdateTimeElement.textContent = 'No data available.';
+                    noDataMessage.style.display = 'block';
+                    return;
+                }
+
+                let latestEntry = null;
+                snapshot.forEach((childSnapshot) => {
+                    latestEntry = childSnapshot.val();
+                });
+
+                if (latestEntry) {
+                    let formattedTimestamp = 'N/A';
+                    if (latestEntry.timestamp) {
+                        let date = new Date(latestEntry.timestamp);
+                        // Adjust for timezone difference (e.g., Belgium data to Finland display)
+                        date.setTime(date.getTime() + 3600 * 1000); 
+                        const formatter = new Intl.DateTimeFormat('en-GB', {
+                            timeZone: 'Europe/Helsinki',
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit',
+                            hour12: false
+                        });
+                        formattedTimestamp = formatter.format(date);
+                    }
+                    lastUpdateTimeElement.innerHTML = `Last updated at: ${formattedTimestamp} (Finland time)`;
+
+                    const sensorKeys = ['ac', 'heater', 'humidity', 'light', 'motion', 'noise_db', 'temperature'];
+                    sensorKeys.forEach(key => {
+                        let value = latestEntry[key];
+                        let currentKey = key;
+
+                        // Specific handling for noise if it might be named differently
+                        if (key === 'noise_db' && (value === undefined || value === null)) {
+                            value = latestEntry.noise; // Try 'noise' if 'noise_db' isn't found
+                            if (value !== undefined && value !== null) {
+                                currentKey = 'noise'; // Use 'noise' for visual if found
+                            }
+                        }
+                        
+                        if (value !== undefined && value !== null) { 
+                            const visuals = getSensorVisuals(currentKey, value);
+
+                            const sensorItem = document.createElement('div');
+                            sensorItem.className = 'sensor-item';
+                            const img = document.createElement('img');
+                            img.src = visuals.image;
+                            img.alt = currentKey;
+                            const label = document.createElement('div');
+                            label.className = 'label';
+                            label.textContent = currentKey.replace(/_/g, ' ');
+                            const val = document.createElement('div');
+                            val.className = 'value';
+                            val.textContent = visuals.text;
+                            sensorItem.appendChild(img);
+                            sensorItem.appendChild(label);
+                            sensorItem.appendChild(val);
+                            sensorsDisplay.appendChild(sensorItem);
+                        }
+                    });
+                } else {
+                    lastUpdateTimeElement.textContent = 'No data available.';
+                    noDataMessage.style.display = 'block';
+                }
+            }, (error) => {
+                console.error("Error reading latest status data:", error);
+                document.getElementById('error-message').textContent = `Error loading latest status: ${error.message}`;
+                document.getElementById('error-message').style.display = 'block';
+            });
+        }
+
+        // Function to read ALL status data and render/update charts, with optional filtering
+        // filterType: 'all' (default), 'today'
+        function readAllStatusDataAndRenderCharts(filterType = 'all') {
+            const statusRef = database.ref('smartclass/status');
+            statusRef.on('value', (snapshot) => {
+                let processedData = []; // To store all data before sorting
+                if (!snapshot.exists() || snapshot.numChildren() === 0) {
+                    console.warn("No historical data found for charts.");
+                    destroyAllCharts();
+                    return;
+                }
+
+                snapshot.forEach((childSnapshot) => {
+                    const data = childSnapshot.val();
+                    if (data.timestamp) { // Ensure timestamp exists
+                        const date = new Date(data.timestamp);
+                        // Apply same timezone correction as for latest data display
+                        date.setTime(date.getTime() + 3600 * 1000); // Adding 1 hour for Belgium to Finland if needed
+                        const timestampLabel = new Intl.DateTimeFormat('en-GB', {
+                            timeZone: 'Europe/Helsinki',
+                            day: '2-digit', month: '2-digit',
+                            hour: '2-digit', minute: '2-digit', hour12: false
+                        }).format(date);
+
+                        // Robustly collect data, using nullish coalescing (??) for missing numeric/binary values
+                        // This ensures Chart.js draws gaps instead of breaking.
+                        processedData.push({
+                            timestamp: date.getTime(), // Store as milliseconds for sorting
+                            label: timestampLabel,
+                            temperature: data.temperature ?? null,
+                            humidity: data.humidity ?? null,
+                            ac: data.ac ?? null,
+                            heater: data.heater ?? null,
+                            light: data.light ?? null,
+                            motion: data.motion ?? null,
+                            // Check for both 'noise_db' and 'noise' for noise data
+                            noise_db: (data.noise_db !== undefined && data.noise_db !== null) ? data.noise_db : (data.noise ?? null)
+                        });
+                    }
+                });
+
+                // Sort data by timestamp for correct chronological chart rendering
+                processedData.sort((a, b) => a.timestamp - b.timestamp);
+                
+                let filteredData = [...processedData]; // Start with all processed data
+
+                // --- Filtering based on filterType ---
+                if (filterType === 'today') {
+                    console.log("Filtering data for today...");
+                    const now = new Date();
+                    // Get today's date parts in Helsinki timezone
+                    const todayHelsinkiLocaleString = now.toLocaleString("en-US", { timeZone: "Europe/Helsinki" });
+                    const todayHelsinki = new Date(todayHelsinkiLocaleString);
+                    todayHelsinki.setHours(0, 0, 0, 0); // Set to start of day in Helsinki's interpreted local time
+
+                    const tomorrowHelsinki = new Date(todayHelsinki);
+                    tomorrowHelsinki.setDate(todayHelsinki.getDate() + 1); // Set to start of tomorrow
+
+                    const startOfDayTimestamp = todayHelsinki.getTime();
+                    const endOfDayTimestamp = tomorrowHelsinki.getTime(); // Exclude tomorrow's 00:00:00
+
+                    filteredData = processedData.filter(d =>
+                        d.timestamp >= startOfDayTimestamp && d.timestamp < endOfDayTimestamp
+                    );
+                    console.log(`Found ${filteredData.length} data points for today.`);
+                    if (filteredData.length === 0) {
+                        alert("No data available for today. Please try 'Show All Data'.");
+                    }
+                } else {
+                    console.log(`Showing all ${filteredData.length} data points.`);
+                }
+
+                allSensorData = filteredData; // Store the (filtered) data globally
+
+                // Render or update all charts
+                renderOrUpdateAllCharts();
+
+                // Show the default chart tab (e.g., Temperature)
+                showChartTab('temperature');
+
+            }, (error) => {
+                console.error("Error reading historical data:", error);
+                destroyAllCharts(); // Destroy charts on error
+            });
+        }
+
+        // Helper to destroy all chart instances
+        function destroyAllCharts() {
+            if (temperatureChart) { temperatureChart.destroy(); temperatureChart = null; }
+            if (humidityChart) { humidityChart.destroy(); humidityChart = null; }
+            if (acChart) { acChart.destroy(); acChart = null; }
+            if (heaterChart) { heaterChart.destroy(); heaterChart = null; }
+            if (lightChart) { lightChart.destroy(); lightChart = null; }
+            if (motionChart) { motionChart.destroy(); motionChart = null; }
+            if (noiseChart) { noiseChart.destroy(); noiseChart = null; }
+        }
+
+        // Function to render or update ALL chart instances
+        function renderOrUpdateAllCharts() {
+            if (allSensorData.length === 0) {
+                destroyAllCharts();
+                return;
+            }
+
+            const chartLabels = allSensorData.map(d => d.label);
+
+            // --- Temperature Chart ---
+            const temperatures = allSensorData.map(d => d.temperature);
+            temperatureChart = updateChart('temperatureChart', temperatureChart, temperatures, chartLabels, 'Temperature (°C)', 'rgb(255, 99, 132)', false, 'Temperature Trend');
+
+            // --- Humidity Chart ---
+            const humidities = allSensorData.map(d => d.humidity);
+            humidityChart = updateChart('humidityChart', humidityChart, humidities, chartLabels, 'Humidity (%)', 'rgb(54, 162, 235)', false, 'Humidity Trend');
+
+            // --- AC Chart (Binary: 0 or 1) ---
+            const acValues = allSensorData.map(d => d.ac);
+            acChart = updateChart('acChart', acChart, acValues, chartLabels, 'AC State (On/Off)', 'rgb(255, 205, 86)', true, 'AC State Over Time');
+
+            // --- Heater Chart (Binary: 0 or 1) ---
+            const heaterValues = allSensorData.map(d => d.heater);
+            heaterChart = updateChart('heaterChart', heaterChart, heaterValues, chartLabels, 'Heater State (On/Off)', 'rgb(255, 159, 64)', true, 'Heater State Over Time');
+
+            // --- Light Chart (Binary: 0 or 1) ---
+            const lightValues = allSensorData.map(d => d.light);
+            lightChart = updateChart('lightChart', lightChart, lightValues, chartLabels, 'Light State (On/Off)', 'rgb(75, 192, 192)', true, 'Light State Over Time');
+
+            // --- Motion Chart (Binary: 0 or 1) ---
+            const motionValues = allSensorData.map(d => d.motion);
+            motionChart = updateChart('motionChart', motionChart, motionValues, chartLabels, 'Motion Detected (Yes/No)', 'rgb(153, 102, 255)', true, 'Motion Detection Over Time');
+
+            // --- Noise Chart ---
+            const noiseValues = allSensorData.map(d => d.noise_db); 
+            noiseChart = updateChart('noiseChart', noiseChart, noiseValues, chartLabels, 'Noise Level (dB)', 'rgb(201, 203, 207)', false, 'Noise Level Trend');
+        }
+
+        // Generic function to create or update a chart
+        function updateChart(canvasId, chartInstance, data, labels, labelText, borderColor, stepped, chartTitle) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) { 
+                console.warn(`Canvas element with ID '${canvasId}' not found. Skipping chart creation/update.`);
+                return null;
+            }
+
+            if (chartInstance) {
+                chartInstance.data.labels = labels;
+                chartInstance.data.datasets[0].data = data;
+                chartInstance.update();
+            } else {
+                chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: labelText,
+                            data: data,
+                            borderColor: borderColor,
+                            borderWidth: 2,
+                            tension: stepped ? 0 : 0.4,
+                            stepped: stepped,
+                            pointRadius: 3,
+                            pointBackgroundColor: borderColor,
+                            pointHoverRadius: 5,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time (Day-Month Hour:Minute)'
+                                },
+                                grid: { display: false }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: labelText
+                                },
+                                beginAtZero: stepped,
+                                min: stepped ? -0.1 : undefined,
+                                max: stepped ? 1.1 : undefined,
+                                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                                ticks: {
+                                    callback: function(value, index, values) {
+                                        if (stepped) { 
+                                            if (value === 1) return 'On';
+                                            if (value === 0) return 'Off';
+                                            return '';
+                                        }
+                                        return value;
+                                    }
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: chartTitle
+                            },
+                            legend: { display: false }
+                        }
+                    }
+                });
+            }
+            return chartInstance;
+        }
+
+        // Function to handle tab switching
+        function showChartTab(tabName) {
+            // Deactivate all tab buttons and hide all chart containers
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelectorAll('.chart-container').forEach(container => {
+                container.classList.remove('active');
+            });
+
+            // Activate the clicked tab button and show its corresponding chart container
+            const tabButton = document.querySelector(`.tab-button[onclick="showChartTab('${tabName}')"]`);
+            if (tabButton) {
+                tabButton.classList.add('active');
+            }
+            const chartContainer = document.getElementById(`${tabName}ChartContainer`);
+            if (chartContainer) {
+                chartContainer.classList.add('active');
+            }
+
+            // Force Chart.js to redraw if the chart was hidden
+            switch (tabName) {
+                case 'temperature': if (temperatureChart) temperatureChart.resize(); break;
+                case 'humidity': if (humidityChart) humidityChart.resize(); break;
+                case 'ac': if (acChart) acChart.resize(); break;
+                case 'heater': if (heaterChart) heaterChart.resize(); break;
+                case 'light': if (lightChart) lightChart.resize(); break;
+                case 'motion': if (motionChart) motionChart.resize(); break;
+                case 'noise': if (noiseChart) noiseChart.resize(); break;
+            }
+        }
+    </script>
+</body>
+</html>
