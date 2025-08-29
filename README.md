@@ -2,6 +2,10 @@
 
 This project is a web-based dashboard for monitoring and visualizing real-time and historical sensor data from a smart classroom. It uses Firebase Realtime Database for data storage and Chart.js for data visualization.
 
+![Dashboard Screenshot](/images/project_images/dashboard.jpg)
+![Dashboard Screenshot](/images/project_images/chart_info.jpg)
+
+
 ## Features
 
 - Real-time status display for sensors: AC, Heater, Humidity, Light, Motion, Noise, Temperature
