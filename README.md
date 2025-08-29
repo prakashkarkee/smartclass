@@ -9,6 +9,9 @@ This project is a web-based dashboard for monitoring and visualizing real-time a
 ## Features
 
 - Real-time status display for sensors: AC, Heater, Humidity, Light, Motion, Noise, Temperature
+
+![Dashboard Screenshot](/images/project_images/schematic_diagram.jpg)
+
 - Historical data charts for each sensor
 - Toggle between today's data and all historical data
 - Responsive and modern UI
@@ -16,13 +19,10 @@ This project is a web-based dashboard for monitoring and visualizing real-time a
 ## Project Structure
 
 ```
-index.html
-images/
-    ac_green.png
-    ac_red.png
-    ...
-    temperature_green.png
-    temperature_red.png
+Here is the flow chart depicting the logic diagram. 
+
+![Dashboard Screenshot](/images/project_images/flowchart.jpg)
+
 ```
 
 ## Setup
