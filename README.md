@@ -116,12 +116,13 @@ The Smart Classroom IoT-Based Monitoring System improves classroom comfort by au
 // ========================
 // Wi-Fi & Firebase
 // ========================
-#define WIFI_SSID "University"
-#define WIFI_PASSWORD "someone2334"
-#define API_KEY "ghteCMHPff049YeCmjaA2J-wab1dTrPS3fdsfdsf"
-#define DATABASE_URL "https://smartclassoulu-default-rtdb.europe-west1.firebasedatabase.app"
-#define USER_EMAIL "firebaseEmail@gmail.com"
-#define USER_PASSWORD "password"
+// replace Wifi name, password, Firebase project API key, Database URL, useremail and password
+#define WIFI_SSID     "Your_WiFi_Name"
+#define WIFI_PASSWORD "Your_WiFi_Password"
+#define API_KEY       "Your_Firebase_API_Key"
+#define DATABASE_URL  "your-project-id.firebaseio.com"
+#define USER_EMAIL    "your-firebase-user@email.com"
+#define USER_PASSWORD "your-firebase-password"
 
 FirebaseData fbData;
 FirebaseConfig fbConfig;
@@ -146,9 +147,9 @@ FirebaseESP32 firebase;
 
 #define SAMPLE_RATE     16000
 #define SAMPLE_BITS     32
-#define BUFFER_SIZE     512        // DMA read buffer size
-#define AVERAGE_BUFFERS 4          // Number of buffers to average
-#define SMOOTHING_ALPHA 0.2        // Moving average weight
+#define BUFFER_SIZE     1024
+#define AVERAGE_BUFFERS 4
+#define SMOOTHING_ALPHA 0.2
 
 DHT dht(DHTPIN, DHTTYPE);
 
@@ -160,11 +161,11 @@ unsigned long lastMotionTime = 0;
 bool heaterOn = false;
 bool acOn = false;
 
-const unsigned long MOTION_TIMEOUT = 120000;   // 2 min
-const unsigned long DHT_INTERVAL = 5000;       // 5 sec
-const unsigned long NOISE_INTERVAL = 2000;     // 2 sec
-const unsigned long STATUS_INTERVAL = 5000;    // 5 sec
-const unsigned long FIREBASE_INTERVAL = 180000; // 3 min
+const unsigned long MOTION_TIMEOUT   = 360000;   //  6 minutes
+const unsigned long DHT_INTERVAL     = 60000;    // 60 sec
+const unsigned long NOISE_INTERVAL   = 60000;    // 60 sec
+const unsigned long STATUS_INTERVAL  = 75000;    // 75 sec
+const unsigned long FIREBASE_INTERVAL= 300000;   // 5 minutes
 
 unsigned long lastDHTRead = 0;
 unsigned long lastNoiseRead = 0;
@@ -174,11 +175,10 @@ unsigned long lastFirebaseUpdate = 0;
 float currentTemp = NAN;
 float currentHum = NAN;
 double currentNoiseDB = 0;
-double smoothed_dB = 0; // For smoothing
+double smoothed_dB = 0;
 
-// Hysteresis for AC/Heater
-const float TEMP_LOWER = 20.0;
-const float TEMP_UPPER = 22.0;
+const float TEMP_LOWER = 20.00;
+const float TEMP_UPPER = 25.00;
 
 // ========================
 // I2S configuration
@@ -223,51 +223,74 @@ void setup() {
     i2s_set_pin(I2S_PORT, &pin_config);
     i2s_zero_dma_buffer(I2S_PORT);
 
+    // ========================
     // Wi-Fi
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    // ========================
     Serial.print("Connecting to Wi-Fi");
-    while (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    unsigned long startAttemptTime = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 15000) {
         delay(500);
         Serial.print(".");
     }
-    Serial.println("\nConnected to Wi-Fi");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("\nConnected to Wi-Fi");
+    } else {
+        Serial.println("\nWi-Fi failed (offline mode)");
+    }
 
+    // ========================
     // NTP time
-    configTime(0, 0, "pool.ntp.org");
-    setenv("TZ", "CET-1CEST,M3.5.0/02:00,M10.5.0/03:00", 1);
-    tzset();
-    time_t now = time(nullptr);
-    while (now < 1000000000) {
-        delay(500);
-        Serial.print(".");
-        now = time(nullptr);
+    // ========================
+    if (WiFi.status() == WL_CONNECTED) {
+        configTime(0, 0, "pool.ntp.org");
+        setenv("TZ", "CET-1CEST,M3.5.0/02:00,M10.5.0/03:00", 1);
+        tzset();
+        unsigned long ntpStart = millis();
+        time_t now = time(nullptr);
+        while (now < 1000000000 && millis() - ntpStart < 10000) {
+            delay(500);
+            Serial.print(".");
+            now = time(nullptr);
+        }
+        if (now < 1000000000) {
+            Serial.println("\nNTP failed (using millis)");
+        } else {
+            Serial.println("\nTime synchronized!");
+        }
     }
-    Serial.println("\nTime synchronized!");
 
+    // ========================
     // Firebase
-    fbConfig.api_key = API_KEY;
-    fbConfig.database_url = DATABASE_URL;
-    fbAuth.user.email = USER_EMAIL;
-    fbAuth.user.password = USER_PASSWORD;
-    firebase.begin(&fbConfig, &fbAuth);
-    firebase.reconnectWiFi(true);
+    // ========================
+    if (WiFi.status() == WL_CONNECTED) {
+        fbConfig.api_key = API_KEY;
+        fbConfig.database_url = DATABASE_URL;
+        fbAuth.user.email = USER_EMAIL;
+        fbAuth.user.password = USER_PASSWORD;
+        firebase.begin(&fbConfig, &fbAuth);
+        firebase.reconnectWiFi(true);
+        Serial.println("Firebase ready");
+    } else {
+        Serial.println("Firebase skipped (no Wi-Fi)");
+    }
 
-    Serial.println("✅ System Started");
+    Serial.println("System Started");
 }
 
 // ========================
 // Functions
 // ========================
 
-// --- Motion handler ---
-void handleMotion() {
+void handleMotionAndTemperature() {
     bool motion = digitalRead(PIR_PIN) == HIGH;
     if (motion) {
-        if (!motionDetected) Serial.println("🚶 Motion detected!");
+        if (!motionDetected) Serial.println("Motion detected!");
         motionDetected = true;
         lastMotionTime = millis();
         digitalWrite(LED_PIN, HIGH);
     }
+
     if (motionDetected && millis() - lastMotionTime > MOTION_TIMEOUT) {
         motionDetected = false;
         digitalWrite(LED_PIN, LOW);
@@ -275,11 +298,26 @@ void handleMotion() {
         digitalWrite(AC_PIN, LOW);
         heaterOn = false;
         acOn = false;
-        Serial.println("⏹ Motion timeout → Everything OFF");
+        Serial.println("Motion timeout → Everything OFF");
+    }
+
+    if (motionDetected && !isnan(currentTemp)) {
+        if (currentTemp < TEMP_LOWER && !heaterOn) {
+            digitalWrite(HEATER_PIN, HIGH);
+            digitalWrite(AC_PIN, LOW);
+            heaterOn = true; acOn = false;
+        } else if (currentTemp > TEMP_UPPER && !acOn) {
+            digitalWrite(HEATER_PIN, LOW);
+            digitalWrite(AC_PIN, HIGH);
+            heaterOn = false; acOn = true;
+        }
+    } else {
+        digitalWrite(HEATER_PIN, LOW);
+        digitalWrite(AC_PIN, LOW);
+        heaterOn = false; acOn = false;
     }
 }
 
-// --- DHT (non-blocking) ---
 void readDHT_nonBlocking() {
     if (millis() - lastDHTRead >= DHT_INTERVAL) {
         lastDHTRead = millis();
@@ -290,11 +328,9 @@ void readDHT_nonBlocking() {
     }
 }
 
-// --- Noise (non-blocking) ---
 void readNoise_nonBlocking() {
     if (millis() - lastNoiseRead >= NOISE_INTERVAL) {
         lastNoiseRead = millis();
-
         int32_t buffer[BUFFER_SIZE];
         size_t bytesRead = 0;
         if (i2s_read(I2S_PORT, (char*)buffer, sizeof(buffer), &bytesRead, 0) && bytesRead > 0) {
@@ -304,7 +340,7 @@ void readNoise_nonBlocking() {
                 double sample = buffer[i] / 2147483648.0;
                 totalSum += sample * sample;
             }
-            double rms = sqrt(totalSum / samples + 1e-10); // avoid 0
+            double rms = sqrt(totalSum / samples + 1e-10);
             double dB = 20 * log10(rms) + 94;
             smoothed_dB = SMOOTHING_ALPHA * dB + (1 - SMOOTHING_ALPHA) * smoothed_dB;
             currentNoiseDB = smoothed_dB;
@@ -312,29 +348,6 @@ void readNoise_nonBlocking() {
     }
 }
 
-// --- Heater/AC control ---
-void controlHeaterAC(float temperature, bool motionActive) {
-    if (!motionActive || isnan(temperature)) {
-        digitalWrite(HEATER_PIN, LOW);
-        digitalWrite(AC_PIN, LOW);
-        heaterOn = false;
-        acOn = false;
-        return;
-    }
-    if (temperature < TEMP_LOWER && !heaterOn) {
-        digitalWrite(HEATER_PIN, HIGH);
-        digitalWrite(AC_PIN, LOW);
-        heaterOn = true;
-        acOn = false;
-    } else if (temperature > TEMP_UPPER && !acOn) {
-        digitalWrite(HEATER_PIN, LOW);
-        digitalWrite(AC_PIN, HIGH);
-        heaterOn = false;
-        acOn = true;
-    }
-}
-
-// --- Status printing ---
 void printStatus() {
     if (millis() - lastStatusPrint >= STATUS_INTERVAL) {
         lastStatusPrint = millis();
@@ -349,7 +362,6 @@ void printStatus() {
     }
 }
 
-// --- Timestamp ---
 String getTimestampString() {
     time_t now = time(nullptr);
     struct tm* timeinfo = localtime(&now);
@@ -358,7 +370,6 @@ String getTimestampString() {
     return String(buffer);
 }
 
-// --- Firebase push ---
 void pushToFirebase() {
     FirebaseJson json;
     json.set("temperature", isnan(currentTemp) ? 0 : currentTemp);
@@ -371,12 +382,52 @@ void pushToFirebase() {
     json.set("timestamp", getTimestampString());
 
     String path = "/smartclass/status";
-
     if (firebase.pushJSON(fbData, path, json)) {
-        Serial.println("✅ Firebase updated");
+        Serial.println("Firebase updated");
     } else {
-        Serial.print("❌ Firebase failed: ");
+        Serial.print("Firebase failed: ");
         Serial.println(fbData.errorReason());
+    }
+}
+
+// ========================
+// Reconnect
+// ========================
+const unsigned long RECONNECT_INTERVAL = 300000; // 5 min
+unsigned long lastReconnectAttempt = 0;
+
+void reconnectIfNeeded() {
+    if (millis() - lastReconnectAttempt < RECONNECT_INTERVAL) return;
+    lastReconnectAttempt = millis();
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("Reconnecting Wi-Fi...");
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+        unsigned long startAttempt = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - startAttempt < 5000) {
+            delay(500);
+            Serial.print(".");
+        }
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("\nWi-Fi reconnected");
+        } else {
+            Serial.println("\nWi-Fi reconnect failed");
+            return;
+        }
+    }
+
+    if (!Firebase.ready()) {
+        Serial.println("Reconnecting Firebase...");
+        firebase.begin(&fbConfig, &fbAuth);
+        firebase.reconnectWiFi(true);
+
+        if (Firebase.ready()) {
+            Serial.println("Firebase reconnected");
+        } else {
+            Serial.println("Firebase reconnect failed");
+        }
     }
 }
 
@@ -384,16 +435,17 @@ void pushToFirebase() {
 // Main Loop
 // ========================
 void loop() {
-    handleMotion();
     readDHT_nonBlocking();
     readNoise_nonBlocking();
-    controlHeaterAC(currentTemp, motionDetected);
+    handleMotionAndTemperature();
     printStatus();
 
     if (millis() - lastFirebaseUpdate >= FIREBASE_INTERVAL) {
         lastFirebaseUpdate = millis();
         pushToFirebase();
     }
+
+    reconnectIfNeeded();
 }
 ```
 
