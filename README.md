@@ -447,7 +447,6 @@ void loop() {
 
     reconnectIfNeeded();
 }
-
 ```
 
 ## Dependencies
