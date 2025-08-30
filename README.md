@@ -411,3 +411,7 @@ void loop() {
 3. **DHT11 Sensor**: [DHT11 Datasheet](https://www.electronicwings.com)
 4. **PIR Sensor**: [PIR Sensor Datasheet](https://www.adafruit.com)
 5. **I2S Microphone**: [I2S Microphone Datasheet](https://www.adafruit.com)
+
+## Additional Resources
+- 📊 [Project Presentation (Slides)](/presentation/RTES_SUMMER_PRESENTATION_VULCANS.pptx)  
+- 🎥 [Demo Video](/Video_demo.mp4) 
