@@ -1,8 +1,8 @@
-![Dashboard Screenshot](/images/project_images/universitylogo.png)
+![Dashboard Screenshot](/images/project_images/summer_programmer.png)
 
 
 # Smart ClassRoom Project
-
+ Team Members : 
       Prakash Karkee
       Brian Kiprop
       Lihini Karunarathne
