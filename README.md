@@ -3,6 +3,24 @@
 
 # Smart Classroom IoT-Based Monitoring System Project
 
+## Table of Contents
+
+- [Introduction](#introduction)  
+- [Problem Statement](#problem-statement)  
+- [Goals and Objectives](#goals-and-objectives)  
+- [Features](#features)  
+- [Tools and Methodology](#tools-and-methodology)  
+- [System Architecture](#system-architecture)  
+- [Circuit Diagram](#circuit-diagram)  
+- [System Logic](#system-logic)  
+- [Results](#results)  
+- [Challenges & Future Works](#challenges--future-works)  
+- [Conclusion](#conclusion)  
+- [Team Members](#team-members)  
+- [Project Code (ESP32)](#project-code-esp32)  
+- [Dependencies](#dependencies)  
+- [References](#references)  
+
 ## Introduction
 Classroom environments directly impact student focus, comfort, and learning outcomes. Traditional classrooms lack automated monitoring of temperature, noise, and occupancy, making energy management and real-time supervision difficult. This project aims to solve this by creating a smart classroom system that monitors and automates classroom conditions, such as temperature, humidity, motion, and noise, to improve comfort and energy efficiency.
 
