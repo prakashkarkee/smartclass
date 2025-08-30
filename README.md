@@ -2,10 +2,11 @@
 
 
 # Smart ClassRoom Project
- Team Members : 
-      Prakash Karkee
-      Brian Kiprop
-      Lihini Karunarathne
+    Team Members : 
+
+         Prakash Karkee
+         Brian Kiprop
+         Lihini Karunarathne
 
 
 # Smart Class Environment Dashboard
