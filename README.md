@@ -1,3 +1,13 @@
+![Dashboard Screenshot](/images/project_images/universitylogo.png)
+
+
+# Smart ClassRoom Project
+
+      Prakash Karkee
+      Brian Kiprop
+      Lihini Karunarathne
+
+
 # Smart Class Environment Dashboard
 
 This project is a web-based dashboard for monitoring and visualizing real-time and historical sensor data from a smart classroom. It uses Firebase Realtime Database for data storage and Chart.js for data visualization.
