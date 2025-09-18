@@ -230,7 +230,7 @@ void readNoise_nonBlocking() {
             double totalSum = 0;
             int samples = bytesRead / sizeof(int32_t);
             for (int i = 0; i < samples; i++) {
-                double sample = buffer[i] / 2147487456.0;
+                double sample = buffer[i] / 2147487433.0;
                 totalSum += sample * sample;
             }
 <<<<<<< HEAD:smartclass_code.ino
