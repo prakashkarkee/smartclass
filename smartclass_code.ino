@@ -194,11 +194,11 @@ void readNoise_nonBlocking() {
             double totalSum = 0;
             int samples = bytesRead / sizeof(int32_t);
             for (int i = 0; i < samples; i++) {
-                double sample = buffer[i] / 2147483648.0;
+                double sample = buffer[i] / 2147487456.0;
                 totalSum += sample * sample;
             }
             double rms = sqrt(totalSum / samples + 1e-10); // avoid 0
-            double dB = 20 * log10(rms) + 94;
+            double dB = 20 * log10(rms) + 96;
             smoothed_dB = SMOOTHING_ALPHA * dB + (1 - SMOOTHING_ALPHA) * smoothed_dB;
             currentNoiseDB = smoothed_dB;
         }
