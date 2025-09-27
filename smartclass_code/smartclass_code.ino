@@ -214,10 +214,10 @@ void handleMotionAndTemperature() {
 void readDHT_nonBlocking() {
     if (millis() - lastDHTRead >= DHT_INTERVAL) {
         lastDHTRead = millis();
-        float t = dht.readTemperature();
-        float h = dht.readHumidity();
-        if (!isnan(t)) currentTemp = t;
-        if (!isnan(h)) currentHum = h;
+        float temp = dht.readTemperature();
+        float hum = dht.readHumidity();
+        if (!isnan(t)) currentTemp = temp;
+        if (!isnan(h)) currentHum = hum;
     }
 }
 
